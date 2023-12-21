@@ -10,13 +10,16 @@ interface TestProps {
 }
 
 interface UnknownValueProps {
-    value: any;
+    value: unknown;
 }
 
 interface UnknownArrProps {
-    arr: any[];
+    arr: unknown[];
 }
 
+interface accObject {
+    [key: string]: number
+}
 
 const testBlock = (name:string) => {
     console.groupEnd();
@@ -24,7 +27,8 @@ const testBlock = (name:string) => {
 };
 
 const areEqual = (props: AreEqualProps): boolean => {
-    return typeof props.a === typeof props.b && props.a?.toString() === props.b?.toString();
+    return typeof props.a === typeof props.b && JSON.stringify(props.a) === JSON.stringify(props.b);
+    //Изменил на более корректный вариант
 };
 
 const test = (props: TestProps): void => {
@@ -40,23 +44,20 @@ const test = (props: TestProps): void => {
     }
 };
 
-
 const getType = (props: UnknownValueProps): string => {
     return typeof props.value;
 };
 
-
-
 const getTypesOfItems = (props: UnknownArrProps): string[] => {
-    return [...props.arr.reduce((acc, elem) => acc.add(getType({ value: elem })), new Set([]))];
+    return props.arr.reduce((acc, elem) => {
+        (acc as string[]).push(getType({ value: elem }));
+        return acc;},
+        []) as string[];
 };
-
 
 const allItemsHaveTheSameType = (props: UnknownArrProps): boolean => {
-    return getTypesOfItems({ arr: props.arr }).length === 1;
+    return getTypesOfItems({arr: props.arr}).every((elem, index, array) => elem === array[0]);
 };
-
-
 
 const getRealType = (props: UnknownValueProps): string => {
     if (typeof props.value === "bigint")
@@ -65,9 +66,9 @@ const getRealType = (props: UnknownValueProps): string => {
         return 'date';
     else if (props.value instanceof Array)
         return 'array'
-    else if (isNaN(props.value) && typeof(props.value) === "number")
+    else if (typeof(props.value) === "number" && isNaN(props.value))
         return 'NaN'
-    else if (!isFinite(props.value) && typeof(props.value) === "number")
+    else if (typeof(props.value) === "number" && !isFinite(props.value))
         return 'Infinity'
     else if (props.value instanceof RegExp)
         return 'regexp'
@@ -83,16 +84,21 @@ const getRealType = (props: UnknownValueProps): string => {
 
 
 const getRealTypesOfItems = (props: UnknownArrProps): string[] => {
-    return [...props.arr.reduce((acc, elem) => acc.add(getRealType({ value: elem })), new Set([]))];
+    return props.arr.reduce((acc, elem) => {
+        (acc as string[]).push(getRealType({value: elem}));
+        return acc},
+        []) as string[];
 };
 
 const everyItemHasAUniqueRealType = (props: UnknownArrProps): boolean => {
-    return getRealTypesOfItems({ arr: props.arr }).length === props.arr.length;
+    return (new Set(getRealTypesOfItems( {arr: props.arr}))).size === props.arr.length;
 };
 
-const countRealTypes = (props: UnknownArrProps): [string, unknown][] => {
-    return Object.entries(props.arr.reduce((acc, elem) => {
-        acc[getRealType({ value: elem })] = typeof acc[getRealType({ value: elem })] !== "undefined" ? acc[getRealType({ value: elem })] + 1 : 1;
+const countRealTypes = (props: UnknownArrProps): unknown => {
+    return Object.entries(props.arr.reduce<accObject>((acc, elem) => {
+        acc[getRealType({ value: elem }) as keyof Object]  =
+            typeof acc[getRealType({ value: elem }) as keyof Object] !== "undefined"
+            ? acc[getRealType({value: elem}) as keyof Object] as unknown as number + 1 : 1;
         return acc;
     }, {})).sort();
 };
@@ -148,14 +154,17 @@ const knownTypes: unknown[] = [
 ];
 
 test({ whatWeTest: 'Check basic types', actualResult: getTypesOfItems({ arr: knownTypes }), expectedResult: [
-        'boolean',
-        'number',
-        'string',
-        'object',
-        'function',
-        'undefined',
+        'boolean',   'number',
+        'string',    'object',
+        'object',    'function',
+        'undefined', 'object',
+        'number',    'number',
+        'object',    'object',
+        'object',    'object',
         'bigint'
-    ] });
+    ]});
+test({ whatWeTest: 'Nested array with values has array type', actualResult: getRealTypesOfItems({ arr: [[[0, ''],[{}], new Set([1, 2, 3])],[new Date()]] }), expectedResult: ['array', 'array'] });
+
 
 test({ whatWeTest: 'Check real types', actualResult: getRealTypesOfItems({ arr: knownTypes }), expectedResult: [
         'boolean',
@@ -205,4 +214,6 @@ test({ whatWeTest: 'String (not string) type in absent', actualResult: getRealTy
 
 test({ whatWeTest: 'Data', actualResult: getRealType({ value: new Date() }), expectedResult: 'date' });
 
-test({ whatWeTest: 'Nested array with values has array type', actualResult: getRealTypesOfItems({ arr: [[[0, ''],[{}], new Set([1, 2, 3])],[new Date()]] }), expectedResult: ['array'] });
+test({ whatWeTest: 'Nested array with values has array type', actualResult: getRealTypesOfItems({ arr: [[[0, ''],[{}], new Set([1, 2, 3])],[new Date()]] }), expectedResult: ['array', 'array'] });
+
+test({ whatWeTest: 'areEqual() test', actualResult: areEqual({a: { 1: 2 }, b: {}}), expectedResult: false });

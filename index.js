@@ -6,8 +6,7 @@ const testBlock = (name) => {
 };
 
 const areEqual = (a, b) => {
-    return typeof a === typeof b && a?.toString() === b?.toString();
-    // Можно было также сделать отдельно для объектов и примитивных a.length === b.length && a.every((elem, i) => elem === b[i]);
+    return typeof a === typeof b && JSON.stringify(a) === JSON.stringify(b);
 };
 
 const test = (whatWeTest, actualResult, expectedResult) => {
@@ -30,11 +29,14 @@ const getType = (value) => {
 };
 
 const getTypesOfItems = (arr) => {
-    return [...arr.reduce((acc, elem) => acc.add(getType(elem)), new Set([]))];
+    return arr.reduce((acc, elem) => {
+        acc.push(getType(elem));
+        return acc;
+    }, []);
 };
 
 const allItemsHaveTheSameType = (arr) => {
-    return getTypesOfItems(arr).length === 1;
+    return getTypesOfItems(arr).every((elem, index, array) => elem === array[0]);
 };
 
 const getRealType = (value) => {
@@ -61,11 +63,14 @@ const getRealType = (value) => {
 };
 
 const getRealTypesOfItems = (arr) => {
-    return [...arr.reduce((acc, elem) => acc.add(getRealType(elem)), new Set([]))];
+    return arr.reduce((acc, elem) => {
+        acc.push(getRealType(elem));
+        return acc;
+    }, []);
 };
 
 const everyItemHasAUniqueRealType = (arr) => {
-    return getRealTypesOfItems(arr).length === arr.length;
+    return new Set(getRealTypesOfItems(arr)).size === arr.length;
 };
 
 const countRealTypes = (arr) => {
@@ -146,8 +151,16 @@ test('Check basic types', getTypesOfItems(knownTypes), [
     'number',
     'string',
     'object',
+    'object',
     'function',
     'undefined',
+    'object',
+    'number',
+    'number',
+    'object',
+    'object',
+    'object',
+    'object',
     'bigint',
 ]);
 
@@ -205,5 +218,7 @@ test('Data', getRealType(new Date()), 'date');
 test(
     'Nested array with values has array type',
     getRealTypesOfItems([[[0, ''], [{}], new Set([1, 2, 3])], [new Date()]]),
-    ['array']
+    ['array', 'array']
 );
+
+test('areEqual() modification, ', areEqual({ 1: 2 }, {}), false);
